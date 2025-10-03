@@ -1,31 +1,51 @@
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { Button, Text, TextInput } from 'react-native-paper';
+import { View, StyleSheet } from 'react-native';
+import { TextInput, Button, Text } from 'react-native-paper';
+import axios from 'axios';
+import { AERODATABOX_API_KEY, AERODATABOX_HOST } from '@env';
 
 export default function HomeScreen() {
   const [flightNumber, setFlightNumber] = useState('');
   const [result, setResult] = useState('');
 
-  // Simulated "API call" (replace with real flight API later)
   const handleCheckFlight = async () => {
     if (!flightNumber) {
       setResult('⚠️ Please enter a flight number.');
       return;
     }
 
-    // Pretend API response
-    const fakeApiResponse = {
-      flight: flightNumber,
-      status: 'On Time',
-      arrival: '8:25 PM',
-      gate: 'C4',
-    };
+    try {
+      // AeroDataBox requires airline code + number (e.g., "AA100")
+      const url = `https://${AERODATABOX_HOST}/flights/number/${flightNumber}`;
 
-    // Show result
-    setResult(
-      `Flight ${fakeApiResponse.flight} is ${fakeApiResponse.status}. ` +
-      `Expected arrival: ${fakeApiResponse.arrival}, Gate: ${fakeApiResponse.gate}.`
-    );
+      const response = await axios.get(url, {
+        headers: {
+          'x-rapidapi-key': AERODATABOX_API_KEY,
+          'x-rapidapi-host': AERODATABOX_HOST,
+        },
+      });
+
+      const data = response.data;
+
+      if (!data || data.length === 0) {
+        setResult('❌ Flight not found.');
+        return;
+      }
+
+      const flight = data[0];
+      const airline = flight.airline?.name || 'Unknown Airline';
+      const status = flight.status || 'Unknown Status';
+      const arrival = flight.arrival?.scheduledTimeLocal || 'Unknown Arrival';
+      const gate = flight.arrival?.gate || 'Unknown Gate';
+
+      setResult(
+        `${airline} Flight ${flightNumber.toUpperCase()} → ` +
+        `${status}, Arrival: ${arrival}, Gate: ${gate}`
+      );
+    } catch (error) {
+      console.error(error);
+      setResult('❌ Error fetching flight data. Check API key or flight number.');
+    }
   };
 
   return (
@@ -34,7 +54,7 @@ export default function HomeScreen() {
       <Text style={styles.subtitle}>Enter a flight number below:</Text>
 
       <TextInput
-        label="Flight Number"
+        label="Flight Number (e.g., AA100)"
         mode="outlined"
         value={flightNumber}
         onChangeText={setFlightNumber}
